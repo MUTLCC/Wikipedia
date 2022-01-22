@@ -25,7 +25,7 @@ version = re.search(
 
 setuptools.setup(
   name = "wikipedia_sections",
-  version = '.'.join(version),
+  version = "2.0.0",
   author = "Sacha Vakili",
   author_email = "vakili.sacha@gmail.com",
   description = "Wikipedia API for Python extracting sections",
