@@ -29,7 +29,7 @@ def set_lang(prefix):
   .. note:: Make sure you search for page titles in the language that you have set.
   '''
   global API_URL
-  API_URL = 'http://' + prefix.lower() + '.wikipedia.org/w/api.php'
+  API_URL = f'http://{prefix.lower()}.wikipedia.org/w/api.php'
 
   for cached_func in (search, suggest, summary):
     cached_func.clear_cache()
@@ -71,11 +71,7 @@ def set_rate_limiting(rate_limit, min_wait=timedelta(milliseconds=50)):
   global RATE_LIMIT_LAST_CALL
 
   RATE_LIMIT = rate_limit
-  if not rate_limit:
-    RATE_LIMIT_MIN_WAIT = None
-  else:
-    RATE_LIMIT_MIN_WAIT = min_wait
-
+  RATE_LIMIT_MIN_WAIT = None if not rate_limit else min_wait
   RATE_LIMIT_LAST_CALL = None
 
 
@@ -154,8 +150,7 @@ def geosearch(latitude, longitude, title=None, results=10, radius=1000):
     else:
       raise WikipediaException(raw_results['error']['info'])
 
-  search_pages = raw_results['query'].get('pages', None)
-  if search_pages:
+  if search_pages := raw_results['query'].get('pages', None):
     search_results = (v['title'] for k, v in search_pages.items() if k != '-1')
   else:
     search_results = (d['title'] for d in raw_results['query']['geosearch'])
@@ -171,12 +166,11 @@ def suggest(query):
   '''
 
   search_params = {
-    'list': 'search',
-    'srinfo': 'suggestion',
-    'srprop': '',
+      'list': 'search',
+      'srinfo': 'suggestion',
+      'srprop': '',
+      'srsearch': query,
   }
-  search_params['srsearch'] = query
-
   raw_result = _wiki_request(search_params)
 
   if raw_result['query'].get('searchinfo'):
@@ -246,9 +240,7 @@ def summary(title, sentences=0, chars=0, auto_suggest=True, redirect=True):
     query_params['exintro'] = ''
 
   request = _wiki_request(query_params)
-  summary = request['query']['pages'][pageid]['extract']
-
-  return summary
+  return request['query']['pages'][pageid]['extract']
 
 
 def page(title=None, pageid=None, auto_suggest=True, redirect=True, preload=False):
@@ -346,32 +338,26 @@ class WikipediaPage(object):
       else:
         raise PageError(pageid=self.pageid)
 
-    # same thing for redirect, except it shows up in query instead of page for
-    # whatever silly reason
     elif 'redirects' in query:
-      if redirect:
-        redirects = query['redirects'][0]
-
-        if 'normalized' in query:
-          normalized = query['normalized'][0]
-          assert normalized['from'] == self.title, ODD_ERROR_MESSAGE
-
-          from_title = normalized['to']
-
-        else:
-          from_title = self.title
-
-        assert redirects['from'] == from_title, ODD_ERROR_MESSAGE
-
-        # change the title and reload the whole object
-        self.__init__(redirects['to'], redirect=redirect, preload=preload)
-
-      else:
+      if not redirect:
         raise RedirectError(getattr(self, 'title', page['title']))
 
-    # since we only asked for disambiguation in ppprop,
-    # if a pageprop is returned,
-    # then the page must be a disambiguation page
+      redirects = query['redirects'][0]
+
+      if 'normalized' in query:
+        normalized = query['normalized'][0]
+        assert normalized['from'] == self.title, ODD_ERROR_MESSAGE
+
+        from_title = normalized['to']
+
+      else:
+        from_title = self.title
+
+      assert redirects['from'] == from_title, ODD_ERROR_MESSAGE
+
+      # change the title and reload the whole object
+      self.__init__(redirects['to'], redirect=redirect, preload=preload)
+
     elif 'pageprops' in page:
       query_params = {
         'prop': 'revisions',
@@ -387,7 +373,9 @@ class WikipediaPage(object):
       html = request['query']['pages'][pageid]['revisions'][0]['*']
 
       lis = BeautifulSoup(html, 'html.parser').find_all('li')
-      filtered_lis = [li for li in lis if not 'tocsection' in ''.join(li.get('class', []))]
+      filtered_lis = [
+          li for li in lis if 'tocsection' not in ''.join(li.get('class', []))
+      ]
       may_refer_to = [li.a.get_text() for li in filtered_lis if li.a]
 
       raise DisambiguationError(getattr(self, 'title', page['title']), may_refer_to)
@@ -417,12 +405,9 @@ class WikipediaPage(object):
 
       pages = request['query']['pages']
       if 'generator' in query_params:
-        for datum in pages.values():  # in python 3.3+: "yield from pages.values()"
-          yield datum
+        yield from pages.values()
       else:
-        for datum in pages[self.pageid][prop]:
-          yield datum
-
+        yield from pages[self.pageid][prop]
       if 'continue' not in request:
         break
 
@@ -468,10 +453,10 @@ class WikipediaPage(object):
         'explaintext': '',
         'rvprop': 'ids'
       }
-      if not getattr(self, 'title', None) is None:
-         query_params['titles'] = self.title
+      if getattr(self, 'title', None) is not None:
+        query_params['titles'] = self.title
       else:
-         query_params['pageids'] = self.pageid
+        query_params['pageids'] = self.pageid
       request = _wiki_request(query_params)
       self._content     = request['query']['pages'][self.pageid]['extract']
       self._revision_id = request['query']['pages'][self.pageid]['revisions'][0]['revid']
@@ -522,10 +507,10 @@ class WikipediaPage(object):
         'explaintext': '',
         'exintro': '',
       }
-      if not getattr(self, 'title', None) is None:
-         query_params['titles'] = self.title
+      if getattr(self, 'title', None) is not None:
+        query_params['titles'] = self.title
       else:
-         query_params['pageids'] = self.pageid
+        query_params['pageids'] = self.pageid
 
       request = _wiki_request(query_params)
       self._summary = request['query']['pages'][self.pageid]['extract']
@@ -583,7 +568,7 @@ class WikipediaPage(object):
 
     if not getattr(self, '_references', False):
       def add_protocol(url):
-        return url if url.startswith('http') else 'http:' + url
+        return url if url.startswith('http') else f'http:{url}'
 
       self._references = [
         add_protocol(link['*'])
@@ -643,8 +628,8 @@ class WikipediaPage(object):
         'action': 'parse',
         'prop': 'sections',
       }
-      if not getattr(self, 'title', None) is None:
-          query_params["page"] = self.title
+      if getattr(self, 'title', None) is not None:
+        query_params["page"] = self.title
 
       request = _wiki_request(query_params)
       self._sections = [section['line'] for section in request['parse']['sections']]
@@ -719,7 +704,7 @@ def _wiki_request(params):
   global USER_AGENT
 
   params['format'] = 'json'
-  if not 'action' in params:
+  if 'action' not in params:
     params['action'] = 'query'
 
   headers = {
