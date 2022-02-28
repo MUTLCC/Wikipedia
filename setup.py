@@ -24,8 +24,8 @@ version = re.search(
 
 
 setuptools.setup(
-  name = "wikipedia_sections",
-  version = "2.0.0",
+  name = "wikihappy",
+  version = "1.0.0",
   author = "Sacha Vakili",
   author_email = "vakili.sacha@gmail.com",
   description = "Wikipedia API for Python extracting sections",
@@ -42,5 +42,4 @@ setuptools.setup(
     'Programming Language :: Python',
     'Programming Language :: Python :: 3'
   ],
-  download_url='https://github.com/sachavakili/Wikipedia/archive/v2.0.tar.gz',
 )
